@@ -233,9 +233,8 @@ def cosine_score(query_text, collection, collection_index="", lengths="", k=10):
     return {doc_id: scores[doc_id] for doc_id in doc_ids_sorted}
 
 
-def search_in_corpus(query, corpus):
+def search_in_corpus(query, corpus, index):
     # TODO 1. create create_tfidf_index
-    index, _ = create_index(corpus)
 
     # TODO 2. apply ranking
     return cosine_score(query, corpus, collection_index=index, lengths=collection_vectors(corpus,

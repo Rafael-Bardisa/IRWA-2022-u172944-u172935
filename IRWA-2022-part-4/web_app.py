@@ -8,6 +8,7 @@ from flask import Flask, render_template, session
 from flask import request
 
 from myapp.analytics.analytics_data import AnalyticsData, ClickedDoc
+from myapp.search.algorithms import create_index
 from myapp.search.load_corpus import load_corpus
 from myapp.search.objects import Document, StatsDocument
 from myapp.search.search_engine import SearchEngine
@@ -47,6 +48,9 @@ file_path = path + "/tweets-data-who.json"
 
 # file_path = "../../tweets-data-who.json"
 corpus = load_corpus(file_path)
+
+corpus_index, _ = create_index(corpus)
+
 print("loaded corpus. first elem:", list(corpus.values())[0])
 
 
@@ -80,7 +84,7 @@ def search_form_post():
 
     search_id = analytics_data.save_query_terms(search_query)
 
-    results = search_engine.search(search_query, search_id, corpus)
+    results = search_engine.search(search_query, search_id, corpus, corpus_index)
 
     found_count = len(results)
     session['last_found_count'] = found_count
