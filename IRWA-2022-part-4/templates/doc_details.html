@@ -4,21 +4,21 @@
     <meta charset="UTF-8">
     <title>Document Detail - IRWA Search Engine</title>
 </head>
-<hr>
-<h5>Information of the Document clicked</h5>
-    <script>const doc = {{ document | tojson | safe }}; </script>
-    <hr>
-        <div class="pb-3">
-            <div class="">
-                <span class="text-dark"> id: {{ doc.doc_id }} </span>
-                <span class="text-dark"> id: {{ doc.description }} </span>
-                <span class="text-dark"> id: {{ doc.doc_date }} </span>
-                <span class="text-dark"> id: {{ doc.likes }} </span>
-                <span class="text-dark"> id: {{ doc.retweets }} </span>
-                <span class="text-dark"> id: {{ doc.hashtags }} </span>
-            </div>
-        </div>
-    <hr>
+<!hr>
+<!h5>Information of the Document clicked<!/h5>
+    <!script>const doc = {{ document | tojson | safe }}; <!/script>
+        <!div class="pb-3">
+            <!div class="">
+                <!span class="text-dark"> id: {{ doc.doc_id }} <!/span>
+                <!span class="text-dark"> id: {{ doc.description }} <!/span>
+                <!span class="text-dark"> id: {{ doc.doc_date }} <!/span>
+                <!span class="text-dark"> id: {{ doc.likes }} <!/span>
+                <!span class="text-dark"> id: {{ doc.retweets }} <!/span>
+                <!span class="text-dark"> id: {{ doc.hashtags }} <!/span>
+            <!/div>
+        <!/div>
+    <!hr>
+<body>
 <div><a href="#" onclick="history.go(-1)">Go Back</a></div>
 <div><a href="#" onclick="history.go(-2)">Go Back 2 pages</a></div>
 <div><a href="#" onclick="history.go(-3)">Go Back 3 pages</a></div>
