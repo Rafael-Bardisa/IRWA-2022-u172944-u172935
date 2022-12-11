@@ -1,6 +1,7 @@
 import os
 import random
 
+
 from myapp.search.algorithms import search_in_corpus
 from myapp.search.load_corpus import load_corpus
 from myapp.search.objects import ResultItem, Document
