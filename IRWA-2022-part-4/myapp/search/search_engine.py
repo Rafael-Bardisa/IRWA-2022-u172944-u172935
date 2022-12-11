@@ -19,11 +19,11 @@ def build_demo_results(corpus: dict, search_id):
         res.append(ResultItem(item.id, item.title, item.description, item.doc_date,
                               "doc_details?id={}&search_id={}&param2=2".format(item.id, search_id), random.random()))
 
-    for index, item in enumerate(corpus['Id']):
+    # for index, item in enumerate(corpus['Id']):
         # DF columns: 'Id' 'Tweet' 'Username' 'Date' 'Hashtags' 'Likes' 'Retweets' 'Url' 'Language'
         # TODO tambien en la de abajo
-        res.append(ResultItem(item.Id, item.Tweet, item.Tweet, item.Date,
-                              "doc_details?id={}&search_id={}&param2=2".format(item.Id, search_id), random.random()))
+    #     res.append(ResultItem(item.Id, item.Tweet, item.Tweet, item.Date,
+    #                           "doc_details?id={}&search_id={}&param2=2".format(item.Id, search_id), random.random()))
 
     # simulate sort by ranking
     res.sort(key=lambda doc: doc.ranking, reverse=True)
@@ -38,9 +38,9 @@ class SearchEngine:
 
         results = []
         # TODO ##### your code here #####
-        # results = build_demo_results(corpus, search_id)  # TODO replace with call to search algorithm
+        # return build_demo_results(corpus, search_id)  # TODO replace with call to search algorithm
 
-        # (id, score)
+        # (id, score) already sorted
         results = search_in_corpus(search_query, corpus, index).items()
         documents = [corpus[id] for id, _ in results]
         # TODO ##### your code here #####
