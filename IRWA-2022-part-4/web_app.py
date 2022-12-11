@@ -9,7 +9,7 @@ from flask import Flask, render_template, session
 from flask import request
 
 from myapp.analytics.analytics_data import AnalyticsData, ClickedDoc
-from myapp.search.algorithms import create_index
+from myapp.search.algorithms import create_index, collection_vectors
 from myapp.search.load_corpus import load_corpus
 from myapp.search.objects import Document, StatsDocument
 from myapp.search.search_engine import SearchEngine
@@ -50,7 +50,10 @@ file_path = path + "/tweets-data-who.json"
 # file_path = "../../tweets-data-who.json"
 corpus = load_corpus(file_path)
 
+# preload resources for faster execution
 corpus_index, _ = create_index(corpus)
+
+lengths = collection_vectors(corpus, collection_index=corpus_index)
 
 print("loaded corpus. first elem:", list(corpus.values())[0])
 
@@ -85,7 +88,7 @@ def search_form_post():
 
     search_id = analytics_data.save_query_terms(search_query)
 
-    results = search_engine.search(search_query, search_id, corpus, corpus_index)
+    results = search_engine.search(search_query, search_id, corpus, corpus_index, lengths)
 
     found_count = len(results)
     session['last_found_count'] = found_count
@@ -119,9 +122,15 @@ def doc_details():
     else:
         analytics_data.fact_clicks[clicked_doc_id] = 1
 
+    if p1 in analytics_data.fact_two.keys():
+        analytics_data.fact_two[p1] += 1
+    else:
+        analytics_data.fact_two[p1] = 1
+
     print("fact_clicks count for id={} is {}".format(clicked_doc_id, analytics_data.fact_clicks[clicked_doc_id]))
 
     return render_template('doc_details.html')
+    #return render_template('doc_details.html', document=corpus[int(clicked_doc_id)])
 
 
 @app.route('/stats', methods=['GET'])
@@ -132,7 +141,12 @@ def stats():
     """
 
     docs = []
+    search = []
     # TODO ### Start replace with your code ###
+
+    for search_id in analytics_data.fact_two:
+        count = analytics_data.fact_two[search_id]
+        search.append((search_id, count))
 
     for doc_id in analytics_data.fact_clicks:
         row: Document = corpus[int(doc_id)]

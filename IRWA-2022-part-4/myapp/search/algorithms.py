@@ -156,7 +156,7 @@ def collection_vectors(collection, collection_index=""):
     return document_vectors
 
 
-def cosine_score(query_text, collection, collection_index="", lengths="", k=10):
+def cosine_score(query_text, collection, collection_index="", lengths=""):
     """
     computes cosine score of all documents in a collection against a query and ranks them
     accordingly
@@ -165,7 +165,7 @@ def cosine_score(query_text, collection, collection_index="", lengths="", k=10):
     collection_len = len(collection)
     scores = {doc_id: 0 for doc_id in collection.keys()}
     query_terms = build_terms(query_text)  # necessary step since same treatment applied to tweets
-    query_frequencies = Counter(query_terms)  # dictionary of frequency of each term in the query
+    query_frequencies = Counter(query_terms)    # dictionary of frequency of each term in the query
 
     for term in query_terms:
         # query of a term returns the set of documents containing the term
@@ -178,18 +178,16 @@ def cosine_score(query_text, collection, collection_index="", lengths="", k=10):
             scores[doc_id] = query_weight * document_weight
 
     scores = {doc_id: score / np.linalg.norm(list(lengths[doc_id].values())) for doc_id, score in scores.items()}
-    k = k if k else collection_len  # if k is 0 return whole doc id list
-    doc_ids_sorted = sorted(scores, key=scores.get, reverse=True)[:k]
+    doc_ids_sorted = sorted(scores, key=scores.get, reverse=True)
 
     return {doc_id: scores[doc_id] for doc_id in doc_ids_sorted}
 
 
-def search_in_corpus(query, corpus, index):
+def search_in_corpus(query, corpus, index, lengths):
     # TODO 1. create create_tfidf_index
 
     # TODO 2. apply ranking
-    return cosine_score(query, corpus, collection_index=index, lengths=collection_vectors(corpus,
-                                                                                          collection_index=index))
+    return cosine_score(query, corpus, collection_index=index, lengths=lengths)
 
 
 if __name__ == '__main__':

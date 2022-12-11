@@ -32,21 +32,21 @@ def build_demo_results(corpus: dict, search_id):
 class SearchEngine:
     """educational search engine"""
 
-    def search(self, search_query, search_id, corpus, index):
+    def search(self, search_query, search_id, corpus, index, lengths):
         print("Search query:", search_query)
 
         results = []
         # TODO ##### your code here #####
         # return build_demo_results(corpus, search_id)  # TODO replace with call to search algorithm
+
         # (id, score) already sorted
-        results = search_in_corpus(search_query, corpus, index).items()
+        results = search_in_corpus(search_query, corpus, index, lengths).items()
         documents = [corpus[id] for id, _ in results]
         # TODO ##### your code here #####
 
         return [ResultItem(item.id, item.title, item.description, item.doc_date,
                            "doc_details?id={}&search_id={}&param2=2".format(item.id, search_id), score)
                 for item, (_, score) in zip(documents, results)]
-
 
 if __name__ == '__main__':
     full_path = os.path.realpath(__file__)
