@@ -22,8 +22,8 @@ def build_demo_results(corpus: dict, search_id):
     for index, item in enumerate(corpus['Id']):
         # DF columns: 'Id' 'Tweet' 'Username' 'Date' 'Hashtags' 'Likes' 'Retweets' 'Url' 'Language'
         # TODO tambien en la de abajo
-        res.append(Document(item.Id, item.Tweet, item.Tweet, item.Date,
-                                "doc_details?id={}&search_id={}&param2=2".format(item.Id, search_id), random.random()))
+        res.append(ResultItem(item.Id, item.Tweet, item.Tweet, item.Date,
+                              "doc_details?id={}&search_id={}&param2=2".format(item.Id, search_id), random.random()))
 
     # simulate sort by ranking
     res.sort(key=lambda doc: doc.ranking, reverse=True)
@@ -53,4 +53,4 @@ if __name__ == '__main__':
 
     # file_path = "../../tweets-data-who.json"
     corpus = load_corpus(file_path)
-    print(SearchEngine.search("Risk", corpus,))
+    print(SearchEngine.search("Risk", corpus, ))

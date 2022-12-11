@@ -19,18 +19,6 @@ import rank_bm25
 
 BASEDIR = '../../'
 
-try:
-    from google.colab import drive
-
-    drive.mount('/content/drive')
-    BASEDIR = 'drive/MyDrive'
-
-except ModuleNotFoundError:
-    pass
-
-tweets = pd.read_json(f'{BASEDIR}tweets-data-who.json').transpose()
-tweets = tweets.reset_index()  # make sure indexes pair with number of rows
-
 
 def remove_punctuation(text):
     """
@@ -86,29 +74,11 @@ def create_index(tweets):
     index = defaultdict(list)
     title_index = {}  # dictionary to map page titles to page ids
 
-    for tweet in tweets.itertuples(index=True):  # Remember, lines contain all documents from file
-        tweet_text = tweet.full_text
-
-        # tweet id
-        tweet_id = tweet.id
-
+    for tweet in tweets.values():
+        tweet_text = tweet.description
+        tweet_id = tweet.id  # tweet id
         terms = str(tweet_text).split(" ")  # page_title + page_text
-
-        title_index[
-            tweet_id] = tweet.user  ## we do not need to apply get terms to title because it used only to print titles and not in the index
-
-        ## ===============================================================
-        ## create the index for the current page and store it in current_page_index (current_page_index)
-        ## current_page_index ==> { ‘term1’: [current_doc, [list of positions]], ...,‘term_n’: [current_doc, [list of positions]]}
-
-        ## Example: if the curr_doc has id 1 and his text is "web retrieval information retrieval":
-
-        ## current_page_index ==> { ‘web’: [1, [0]], ‘retrieval’: [1, [1,4]], ‘information’: [1, [2]]}
-
-        ## the term ‘web’ appears in document 1 in positions 0,
-        ## the term ‘retrieval’ appears in document 1 in positions 1 and 4
-        ## ===============================================================
-
+        title_index[tweet_id] = tweet.title  ## we do not need to apply get terms to title
         current_page_index = {}
 
         for position, term in enumerate(terms):  # terms contains page_title + page_text. Loop over all terms
@@ -127,7 +97,8 @@ def create_index(tweets):
     return index, title_index
 
 
-index, title_index = create_index(tweets)
+class IndexException(BaseException):
+    pass
 
 
 def query(text, tweet_index=""):
@@ -165,7 +136,11 @@ def tf_idf(term_freq, document_freq, collection_len):
     return (1 + math.log(term_freq)) * math.log(collection_len / document_freq)
 
 
-def doc_score(doc_id, collection_index=index, collection=""):
+class CollectionError(BaseException):
+    pass
+
+
+def doc_score(doc_id, collection_index="", collection=""):
     """
     vector de scores para el documento dado, es lo que hay que usar para
     la document length
@@ -176,8 +151,8 @@ def doc_score(doc_id, collection_index=index, collection=""):
     :return: diccionario de terms y pesos, util para normalizar documentos
     """
     result = {}
-
-    collection = collection if collection else {tweet.id: tweet.full_text for tweet in tweets.itertuples(index=True)}
+    if not collection:
+        raise CollectionError
     collection_len = len(collection)
 
     document = str(collection[doc_id]).split(" ")
@@ -189,30 +164,25 @@ def doc_score(doc_id, collection_index=index, collection=""):
     return result
 
 
-def collection_vectors(collection="", collection_index=index):
+def collection_vectors(collection, collection_index=""):
     """
     multi diccionario de documentos, terms y sus valores tf-idf
     """
     document_vectors = {}
-
-    collection = collection if collection else {tweet.id: tweet.full_text for tweet in tweets.itertuples(index=True)}
+    collection = {tweet.id: tweet.description for tweet in collection.values()}
+    
     for doc_id, document in collection.items():
         document_vectors[doc_id] = doc_score(doc_id, collection_index=collection_index, collection=collection)
 
     return document_vectors
 
 
-document_lengths = collection_vectors()
-
-
-
-def cosine_score(query_text, collection_index=index, collection="", lengths=document_lengths, k=10):
+def cosine_score(query_text, collection, collection_index="", lengths="", k=10):
     """
     computes cosine score of all documents in a collection against a query and ranks them
     accordingly
     """
-
-    collection = collection if collection else {tweet.id: tweet.full_text for tweet in tweets.itertuples(index=True)}
+    collection = {tweet.id: tweet.description for tweet in collection.values()}
     collection_len = len(collection)
 
     scores = {doc_id: 0 for doc_id in collection.keys()}
@@ -263,32 +233,33 @@ def cosine_score(query_text, collection_index=index, collection="", lengths=docu
     return {doc_id: scores[doc_id] for doc_id in doc_ids_sorted}
 
 
-def search_in_corpus(query):
+def search_in_corpus(query, corpus):
     # TODO 1. create create_tfidf_index
+    index, _ = create_index(corpus)
 
     # TODO 2. apply ranking
-    return cosine_score(query)
-
-
-def our_score(query_text, collection_index=index, lengths=document_lengths, k=10):
-    """
-    uhh multiply tf idf score by log popularity of tweet so our ranking is sensitive to tweet popularity
-    """
-    tweet_data = [(tweet.id, tweet.full_text, tweet.retweet_count + tweet.favorite_count + 1) for tweet in
-                  tweets.itertuples(index=True)]
-
-    collection = {tweet_id: text for tweet_id, text, _ in tweet_data}
-
-    score_factor = {tweet_id: np.log10(pop_value) for tweet_id, _, pop_value in tweet_data}
-
-    # tf-idf and cosine score
-    base_score = cosine_score(query_text, collection_index=index, collection=collection, lengths=document_lengths, k=0)
-
-    # get new scores by multiplying tf idf by tweet popularity
-    scores = {tweet_id: score * score_factor[tweet_id] for tweet_id, score in base_score.items()}
-    tweet_ids_sorted = sorted(scores, key=scores.get, reverse=True)[:k]
-    return {tweet_id: scores[tweet_id] for tweet_id in tweet_ids_sorted}
+    return cosine_score(query, corpus, collection_index=index, lengths=collection_vectors(corpus,
+                                                                                          collection_index=index))
 
 
 if __name__ == '__main__':
-    print(search_in_corpus("Risk"))
+    # utils i have from other stuff ive done in the past
+    BLUE = "\033[94m"
+    RED = "\033[91m"
+    WHITE = "\033[0m"
+    BOLD = "\033[1m"
+
+
+    def read(dictionary: dict, color=RED) -> str:
+        """
+        Reads dictionaries in a clearer way
+        :param dictionary: a dictionary to read
+        :param color: ANSI color code to highlight dictionary keys
+        :return: the string to print
+        """
+        entry_list = [f"{color}{key}{WHITE}:\t{value:.2f}" for key, value in dictionary.items()]
+        return "\n".join(entry_list)
+
+    tweets = load_corpus(f'{BASEDIR}tweets-data-who.json')
+
+    print(read(search_in_corpus("Risk", tweets)))
