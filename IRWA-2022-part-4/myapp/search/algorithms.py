@@ -1,5 +1,294 @@
-def search_in_corpus(query):
-    # 1. create create_tfidf_index
+import json
+import csv
+import math
+import numpy as np
+from array import array
+from collections import defaultdict, Counter
+import functools
+from sklearn.manifold import TSNE
 
-    # 2. apply ranking
-    return ""
+from nltk.stem import PorterStemmer
+
+import nltk
+
+nltk.download('stopwords')
+
+from nltk.corpus import stopwords
+import pandas as pd
+import rank_bm25
+
+BASEDIR = '../../'
+
+try:
+    from google.colab import drive
+
+    drive.mount('/content/drive')
+    BASEDIR = 'drive/MyDrive'
+
+except ModuleNotFoundError:
+    pass
+
+tweets = pd.read_json(f'{BASEDIR}tweets-data-who.json').transpose()
+tweets = tweets.reset_index()  # make sure indexes pair with number of rows
+
+
+def remove_punctuation(text):
+    """
+    Removes the characters:
+    !\"#$%&'()*+,-./:;<=>?@[\]^_`{|}~0123456789
+    from the text.
+    """
+
+    chars_to_remove = "!\"#$%&'()*+,-./:;<=>?@[\]^_`{|}~0123456789"
+
+    tr = str.maketrans("", "", chars_to_remove)
+
+    return text.translate(tr)
+
+
+# reuse of the function shown in class to transform text into lowercase and erase stop words in queries
+def build_terms(line):
+    """
+    Preprocess the line removing stop words, stemming,
+    transforming in lowercase and return the tokens of the text.
+
+    Argument:
+    line -- string (text) to be preprocessed
+
+    Returns:
+    line - a list of tokens corresponding to the input text after the preprocessing
+    """
+
+    stemmer = PorterStemmer()
+    stop_words = set(stopwords.words("english"))
+    line = str(line).lower()
+
+    # tremendo pero aligual rompe algo despues
+    line = remove_punctuation(line)
+
+    line = line.split()  # Tokenize the text to get a list of terms
+    line = [x for x in line if x not in stop_words]  # eliminate the stopwords
+    line = [stemmer.stem(word) for word in line]  # perform stemming (HINT: use List Comprehension)
+    return line
+
+
+def create_index(tweets):
+    """
+    Implement the inverted index
+
+    Argument:
+    lines -- collection of Wikipedia articles
+
+    Returns:
+    index - the inverted index (implemented through a Python dictionary) containing terms as keys and the corresponding
+    list of documents where these keys appears in (and the positions) as values.
+    """
+    index = defaultdict(list)
+    title_index = {}  # dictionary to map page titles to page ids
+
+    for tweet in tweets.itertuples(index=True):  # Remember, lines contain all documents from file
+        tweet_text = tweet.full_text
+
+        # tweet id
+        tweet_id = tweet.id
+
+        terms = str(tweet_text).split(" ")  # page_title + page_text
+
+        title_index[
+            tweet_id] = tweet.user  ## we do not need to apply get terms to title because it used only to print titles and not in the index
+
+        ## ===============================================================
+        ## create the index for the current page and store it in current_page_index (current_page_index)
+        ## current_page_index ==> { ‘term1’: [current_doc, [list of positions]], ...,‘term_n’: [current_doc, [list of positions]]}
+
+        ## Example: if the curr_doc has id 1 and his text is "web retrieval information retrieval":
+
+        ## current_page_index ==> { ‘web’: [1, [0]], ‘retrieval’: [1, [1,4]], ‘information’: [1, [2]]}
+
+        ## the term ‘web’ appears in document 1 in positions 0,
+        ## the term ‘retrieval’ appears in document 1 in positions 1 and 4
+        ## ===============================================================
+
+        current_page_index = {}
+
+        for position, term in enumerate(terms):  # terms contains page_title + page_text. Loop over all terms
+            try:
+                # if the term is already in the index for the current page (current_page_index)
+                # append the position to the corresponding list
+                current_page_index[term][1].append(position)
+            except:
+                # Add the new term as dict key and initialize the array of positions and add the position
+                current_page_index[term] = [tweet_id,
+                                            array('I', [position])]  # 'I' indicates unsigned int (int in Python)
+
+        # merge the current page index with the main index
+        for term_page, posting_page in current_page_index.items():
+            index[term_page].append(posting_page)
+    return index, title_index
+
+
+index, title_index = create_index(tweets)
+
+
+def query(text, tweet_index=""):
+    """
+    search for a given text in the tweet collection using the
+    inverted index we previously computed
+    :param text: the query text
+    :param tweet_index: inverted index of the collection, named as such because context of practice
+    :return: list of tweet ids containing all (treated) terms in the query
+    """
+
+    # necessary step since same treatment applied to tweets
+    terms = build_terms(text)
+
+    # select tweet index, defaults to global index but can be specified
+    tweet_index = tweet_index if tweet_index else index
+
+    plausible_ids = []
+    for query_term in terms:
+        # tweet_index[query_term] is list of tweet ids containing query term + position(s) in text, could be useful in the future
+        # plausible_ids[query_term] = tweet_index[query_term]
+
+        # using sets is convenient for using reduce
+        plausible_ids.append(set(term_pos[0] for term_pos in tweet_index[query_term]))
+
+    # reduce list of sets to intersection of all
+    relevant_ids = functools.reduce(lambda a, b: a.intersection(b), plausible_ids) if plausible_ids else []
+
+    return relevant_ids
+
+
+def tf_idf(term_freq, document_freq, collection_len):
+    if term_freq == 0 or document_freq == 0:
+        return 0
+    return (1 + math.log(term_freq)) * math.log(collection_len / document_freq)
+
+
+def doc_score(doc_id, collection_index=index, collection=""):
+    """
+    vector de scores para el documento dado, es lo que hay que usar para
+    la document length
+
+    tremendo usarlo como {doc_id: doc_score(doc_id)} para todos los ids
+    :param doc_id: document id que mirar
+    :params: se supone que así será más flexible pero los defaults van finos asi que na
+    :return: diccionario de terms y pesos, util para normalizar documentos
+    """
+    result = {}
+
+    collection = collection if collection else {tweet.id: tweet.full_text for tweet in tweets.itertuples(index=True)}
+    collection_len = len(collection)
+
+    document = str(collection[doc_id]).split(" ")
+    term_frequencies = Counter(document)
+
+    for term in document:
+        document_freq = len(query(term, tweet_index=collection_index))
+        result[term] = tf_idf(term_frequencies[term], document_freq, collection_len)
+    return result
+
+
+def collection_vectors(collection="", collection_index=index):
+    """
+    multi diccionario de documentos, terms y sus valores tf-idf
+    """
+    document_vectors = {}
+
+    collection = collection if collection else {tweet.id: tweet.full_text for tweet in tweets.itertuples(index=True)}
+    for doc_id, document in collection.items():
+        document_vectors[doc_id] = doc_score(doc_id, collection_index=collection_index, collection=collection)
+
+    return document_vectors
+
+
+document_lengths = collection_vectors()
+
+
+
+def cosine_score(query_text, collection_index=index, collection="", lengths=document_lengths, k=10):
+    """
+    computes cosine score of all documents in a collection against a query and ranks them
+    accordingly
+    """
+
+    collection = collection if collection else {tweet.id: tweet.full_text for tweet in tweets.itertuples(index=True)}
+    collection_len = len(collection)
+
+    scores = {doc_id: 0 for doc_id in collection.keys()}
+
+    # esto seguramente este mal
+    #  length = {doc_id: len(str(document).split(" ")) for doc_id, document in collection.items()}
+
+    query_terms = build_terms(query_text)  # necessary step since same treatment applied to tweets
+
+    # dictionary of frequency of each term in the query
+    query_frequencies = Counter(query_terms)
+
+    for term in query_terms:
+        # query of a term returns the set of documents containing the term
+        document_freq = len(query(term, tweet_index=collection_index))
+
+        query_weight = tf_idf(query_frequencies[term], document_freq, collection_len)
+
+        """
+        for term in query_terms:
+
+        # query of a term returns the set of documents containing the term
+        document_freq = len(query(term, tweet_index=collection_index))
+
+        query_weight = tf_idf(query_frequencies[term], document_freq, collection_len)
+
+        # hasta aqui esta bien probablemente, despues pasa algo raro
+        for doc_id, document in collection.items():
+            # counter of distinct terms in document
+            term_frequencies = Counter(str(document).split(" "))
+            document_weight = tf_idf(term_frequencies[term], document_freq, collection_len)
+            scores[doc_id] += query_weight * document_weight
+        """
+
+        for doc_id, document in collection.items():
+            term_frequencies = Counter(str(document).split(" "))
+            document_weight = tf_idf(term_frequencies[term], document_freq, collection_len)
+
+            doc_vec = list(lengths[doc_id].values())
+            scores[doc_id] = query_weight * document_weight
+
+    scores = {doc_id: score / np.linalg.norm(list(lengths[doc_id].values())) for doc_id, score in scores.items()}
+
+    # if k is 0 return whole doc id list
+    k = k if k else collection_len
+
+    doc_ids_sorted = sorted(scores, key=scores.get, reverse=True)[:k]
+    return {doc_id: scores[doc_id] for doc_id in doc_ids_sorted}
+
+
+def search_in_corpus(query):
+    # TODO 1. create create_tfidf_index
+
+    # TODO 2. apply ranking
+    return cosine_score(query)
+
+
+def our_score(query_text, collection_index=index, lengths=document_lengths, k=10):
+    """
+    uhh multiply tf idf score by log popularity of tweet so our ranking is sensitive to tweet popularity
+    """
+    tweet_data = [(tweet.id, tweet.full_text, tweet.retweet_count + tweet.favorite_count + 1) for tweet in
+                  tweets.itertuples(index=True)]
+
+    collection = {tweet_id: text for tweet_id, text, _ in tweet_data}
+
+    score_factor = {tweet_id: np.log10(pop_value) for tweet_id, _, pop_value in tweet_data}
+
+    # tf-idf and cosine score
+    base_score = cosine_score(query_text, collection_index=index, collection=collection, lengths=document_lengths, k=0)
+
+    # get new scores by multiplying tf idf by tweet popularity
+    scores = {tweet_id: score * score_factor[tweet_id] for tweet_id, score in base_score.items()}
+    tweet_ids_sorted = sorted(scores, key=scores.get, reverse=True)[:k]
+    return {tweet_id: scores[tweet_id] for tweet_id in tweet_ids_sorted}
+
+
+if __name__ == '__main__':
+    print(search_in_corpus("Risk"))
