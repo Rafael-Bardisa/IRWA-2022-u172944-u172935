@@ -1,11 +1,9 @@
 import os
 import random
 
-
-from myapp.search.algorithms import search_in_corpus
+from myapp.search.algorithms import search_in_corpus, create_index
 from myapp.search.load_corpus import load_corpus
 from myapp.search.objects import ResultItem, Document
-
 
 def build_demo_results(corpus: dict, search_id):
     """
@@ -16,9 +14,9 @@ def build_demo_results(corpus: dict, search_id):
     size = len(corpus)
     ll = list(corpus.values())
     for index in range(random.randint(0, 40)):
-        item: Document = ll[random.randint(0, size)]
-        res.append(ResultItem(item.id, item.title, item.description, item.doc_date,
-                              "doc_details?id={}&search_id={}&param2=2".format(item.id, search_id), random.random()))
+       item: Document = ll[random.randint(0, size)]
+       res.append(ResultItem(item.id, item.title, item.description, item.doc_date,
+                             "doc_details?id={}&search_id={}&param2=2".format(item.id, search_id), random.random()))
 
     # for index, item in enumerate(corpus['Id']):
         # DF columns: 'Id' 'Tweet' 'Username' 'Date' 'Hashtags' 'Likes' 'Retweets' 'Url' 'Language'
@@ -40,7 +38,6 @@ class SearchEngine:
         results = []
         # TODO ##### your code here #####
         # return build_demo_results(corpus, search_id)  # TODO replace with call to search algorithm
-
         # (id, score) already sorted
         results = search_in_corpus(search_query, corpus, index).items()
         documents = [corpus[id] for id, _ in results]
@@ -58,4 +55,5 @@ if __name__ == '__main__':
 
     # file_path = "../../tweets-data-who.json"
     corpus = load_corpus(file_path)
-    print(SearchEngine.search("Risk", corpus, ))
+    corpus_index, _ = create_index(corpus)
+    print(SearchEngine().search("Risk", 1234, corpus, corpus_index))

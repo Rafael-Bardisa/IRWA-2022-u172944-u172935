@@ -157,9 +157,10 @@ def dashboard():
 
     # simulate sort by ranking
     visited_docs.sort(key=lambda doc: doc.counter, reverse=True)
-
-    for doc in visited_docs: print(doc)
-    return render_template('dashboard.html', visited_docs=visited_docs)
+    visited_ser=[]
+    for doc in visited_docs:
+        visited_ser.append(doc.to_json())
+    return render_template('dashboard.html', visited_docs=visited_ser)
 
 
 @app.route('/sentiment')
