@@ -248,7 +248,6 @@ if __name__ == '__main__':
     WHITE = "\033[0m"
     BOLD = "\033[1m"
 
-
     def read(dictionary: dict, color=RED) -> str:
         """
         Reads dictionaries in a clearer way
